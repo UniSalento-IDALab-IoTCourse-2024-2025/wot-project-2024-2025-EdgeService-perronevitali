@@ -1,0 +1,31 @@
+[server]
+host = 0.0.0.0
+port = 8080
+debug = false
+
+[sensor]
+gpio_pin = 4
+poll_interval_seconds = 10
+threshold_temperature = 30.0
+threshold_humidity = 70.0
+
+[area]
+name = Nome Area
+beacon_mac = AA:BB:CC:DD:EE:FF
+danger_index_threshold = 100.0
+ip_raspberry = 192.168.1.100
+area_id =
+
+[external_api]
+base_url = http://192.168.1.10:8080/api
+timeout_seconds = 10
+
+[rabbitmq]
+host = 192.168.1.10
+port = 5672
+username = changeme
+password = changeme
+
+[logging]
+level = INFO
+log_file = logs/sensor_service.log
