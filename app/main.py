@@ -103,13 +103,13 @@ async def lifespan(app: FastAPI):
     # Startup
     await rabbitmq_service.connect()
 
-    area_id = await register_area_with_retry()
+    async def register_and_poll():
+        area_id = await register_area_with_retry()
+        await sensor_polling_loop(area_id)
 
-    polling_task = asyncio.create_task(sensor_polling_loop(area_id))
+    polling_task = asyncio.create_task(register_and_poll())
 
-    yield  # l'applicazione gira qui
-
-    # Shutdown
+    yield
     polling_task.cancel()
     try:
         await polling_task
