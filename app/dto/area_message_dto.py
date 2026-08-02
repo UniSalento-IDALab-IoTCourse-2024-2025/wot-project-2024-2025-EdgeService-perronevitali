@@ -1,10 +1,3 @@
-"""
-DTO coerenti con i messaggi pubblicati su faro.areas (topic exchange).
-Rispecchiano it.unisalento.faro.dto.messagesDTO.FaroMessage,
-AreaAlertMessage e AreaSafeMessage (Java), oltre al formato documentato
-in FARO_AMQP_Communication.md.
-"""
-
 from datetime import datetime, timezone
 from typing import Any
 
@@ -29,7 +22,6 @@ class AreaSafePayload(BaseModel):
 
 
 class FaroMessage(BaseModel):
-    """Wrapper generico usato per ogni messaggio su faro.areas / faro.inbox."""
     type: str
     payload: Any
     timestamp: str

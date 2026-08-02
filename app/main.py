@@ -1,9 +1,3 @@
-"""
-Entry point del servizio edge FARO.
-Ogni istanza gira su un Raspberry Pi dedicato a una specifica area
-dell'impianto di stoccaggio.
-"""
-
 import asyncio
 import logging
 from contextlib import asynccontextmanager
@@ -14,7 +8,7 @@ from app.config import settings
 from app.services.sensor_service import sensor_service
 from app.services.rabbitmq_service import rabbitmq_service
 from app.services.area_registration_service import ensure_area_registered
-from app.routers import threshold_router
+from app.routers import threshold_router, mock_router
 from app.constants import AREA_STATUS_ALERT
 
 logger = logging.getLogger(__name__)
@@ -46,13 +40,6 @@ async def register_area_with_retry() -> str | None:
 
 
 async def sensor_polling_loop(area_id: str | None) -> None:
-    """
-    Loop continuo: legge il DHT11 ogni poll_interval_seconds, pubblica
-    ogni lettura su faro.sensors e, quando lo stato dell'area cambia
-    (OK <-> ALERT), pubblica AREA_ALERT/AREA_SAFE direttamente su
-    faro.areas — senza passare dal backend, per garantire la massima
-    velocità di notifica ai worker sottoscritti al topic dell'area.
-    """
     interval = settings.sensor.poll_interval_seconds
 
     while area_id is None:
@@ -113,7 +100,7 @@ async def sensor_polling_loop(area_id: str | None) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # --- Startup ---
+    # Startup
     await rabbitmq_service.connect()
 
     area_id = await register_area_with_retry()
@@ -122,7 +109,7 @@ async def lifespan(app: FastAPI):
 
     yield  # l'applicazione gira qui
 
-    # --- Shutdown ---
+    # Shutdown
     polling_task.cancel()
     try:
         await polling_task
@@ -134,6 +121,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="FARO Edge Service", lifespan=lifespan)
 
 app.include_router(threshold_router.router, prefix="/api")
+app.include_router(mock_router.router, prefix="/api")
 
 
 @app.get("/health")

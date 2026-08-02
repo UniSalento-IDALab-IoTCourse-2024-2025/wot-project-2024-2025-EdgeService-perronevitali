@@ -1,29 +1,8 @@
-"""
-Modulo di configurazione centralizzato.
-
-Responsabilità separate:
-- configparser: legge, valida strutturalmente e riscrive il file .ini
-- pydantic:     valida i valori e li converte nei tipi corretti
-
-Uso:
-    from app.config import settings
-    settings.sensor.gpio_pin
-
-    # dopo la registrazione dell'area sul backend:
-    from app.config import persist_area_id
-    persist_area_id("507f1f77bcf86cd799439011")
-"""
-
 import configparser
 import logging
 from pathlib import Path
 
 from pydantic import BaseModel, Field, ValidationError
-
-
-# ------------------------------------------------------------------
-# Modelli di validazione per ogni sezione del file .ini
-# ------------------------------------------------------------------
 
 class ServerSettings(BaseModel):
     host: str = "0.0.0.0"
@@ -36,6 +15,8 @@ class SensorSettings(BaseModel):
     poll_interval_seconds: float = Field(..., gt=0)
     threshold_temperature: float
     threshold_humidity: float = Field(..., ge=0, le=100)
+    # true = niente hardware reale, le letture arrivano da PUT /api/mock/reading
+    mock: bool = False
 
 
 class AreaSettings(BaseModel):
@@ -63,11 +44,6 @@ class LoggingSettings(BaseModel):
     level: str = "INFO"
     log_file: str = "logs/sensor_service.log"
 
-
-# ------------------------------------------------------------------
-# Contenitore generale
-# ------------------------------------------------------------------
-
 class Settings(BaseModel):
     server: ServerSettings
     sensor: SensorSettings
@@ -78,8 +54,6 @@ class Settings(BaseModel):
 
 
 REQUIRED_SECTIONS = ["server", "sensor", "area", "external_api", "rabbitmq", "logging"]
-
-# Percorso di default, riusato sia da load_settings() che da persist_area_id()
 _DEFAULT_CONFIG_PATH = "config.ini"
 
 
@@ -113,20 +87,6 @@ def load_settings(config_path: str = _DEFAULT_CONFIG_PATH) -> Settings:
 
 
 def persist_area_id(area_id: str, config_path: str = _DEFAULT_CONFIG_PATH) -> None:
-    """
-    Scrive l'area_id ottenuto dal backend (dopo ricerca/creazione) nella
-    sezione [area] di config.ini, così che ai riavvii successivi il
-    servizio possa saltare la ricerca per nome e verificare direttamente
-    l'esistenza dell'area con GET /api/areas/{area_id}.
-
-    Aggiorna sia il file su disco sia l'istanza `settings` già in memoria,
-    per evitare di dover ricaricare la configurazione a runtime.
-
-    NOTA: configparser non preserva i commenti nel file .ini quando lo
-    riscrive. Se in futuro serve mantenerli, l'alternativa è una
-    sostituzione testuale mirata della sola riga `area_id = ...` con
-    una regex, invece di un write() completo del parser.
-    """
     path = Path(config_path)
 
     if not path.exists():
@@ -143,17 +103,13 @@ def persist_area_id(area_id: str, config_path: str = _DEFAULT_CONFIG_PATH) -> No
     with open(path, "w", encoding="utf-8") as f:
         parser.write(f)
 
-    # aggiorna anche l'istanza già caricata in memoria, senza ricaricare da file
     settings.area.area_id = area_id
 
     logger = logging.getLogger(__name__)
     logger.info(f"area_id persistito in {config_path}: {area_id}")
 
-
-# Istanza singleton, caricata all'import
 settings = load_settings()
 
-# Configurazione logging di base, centralizzata qui
 logging.basicConfig(
     level=getattr(logging, settings.logging.level.upper(), logging.INFO),
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -165,12 +121,7 @@ def persist_thresholds(
     danger_index_threshold: float,
     config_path: str = _DEFAULT_CONFIG_PATH,
 ) -> None:
-    """
-    Scrive le soglie aggiornate (ricevute via PUT /api/thresholds dal
-    backend, coerente con ThresholdUpdateDTO a 3 campi) nelle sezioni
-    [sensor] e [area] di config.ini, così che sopravvivano a un riavvio
-    del servizio.
-    """
+
     path = Path(config_path)
 
     if not path.exists():

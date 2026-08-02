@@ -1,9 +1,3 @@
-"""
-Gestisce la connessione AMQP persistente verso RabbitMQ.
-Connessione aperta una sola volta all'avvio (lifespan di main.py) e
-riusata per tutte le pubblicazioni successive.
-"""
-
 import logging
 from datetime import datetime, timezone
 
@@ -60,7 +54,7 @@ class RabbitMQService:
             await self._connection.close()
             logger.info("Connessione RabbitMQ chiusa")
 
-    # -- Letture sensore --------------------------------------------------
+    # Letture sensore
 
     async def publish_sensor_reading(
         self, area_id: str, temperature: float, humidity: float
@@ -87,7 +81,7 @@ class RabbitMQService:
         await self._sensors_exchange.publish(message, routing_key=ROUTING_KEY_SENSORS)
         logger.debug(f"Lettura pubblicata: T={temperature:.1f}°C U={humidity:.1f}%")
 
-    # -- Allarmi per area (faro.areas) -------------------------------------
+    # Allarmi per area (faro.areas)
 
     async def _publish_area_message(self, area_id: str, message_type: str, faro_message: FaroMessage) -> None:
         if self._areas_exchange is None:

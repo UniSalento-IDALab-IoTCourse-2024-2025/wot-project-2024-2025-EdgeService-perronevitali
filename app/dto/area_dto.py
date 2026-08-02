@@ -1,11 +1,9 @@
-"""
-DTO coerenti con it.unisalento.faro.dto.main.AreaDTO e le risposte
-di AreaRestController (Java). I nomi dei campi rispettano il camelCase
-usato da Jackson lato backend.
-"""
-
 from pydantic import BaseModel, Field
 
+AREA_RESULT_OK = 0
+AREA_RESULT_NOT_FOUND = 1
+AREA_RESULT_DUPLICATE_BEACON = 2
+AREA_RESULT_HAS_ACTIVE_TASKS = 3
 
 class AreaDTO(BaseModel):
     id: str | None = None
@@ -33,9 +31,3 @@ class AreaResponseDTO(BaseModel):
     areas: AreasListDTO | None = None
 
 
-# Coerenti con it.unisalento.faro.dto.responseDTO.AreaResponseDTO/BaseResponseDTO:
-# result è un intero, non una stringa
-AREA_RESULT_OK = 0
-AREA_RESULT_NOT_FOUND = 1
-AREA_RESULT_DUPLICATE_BEACON = 2
-AREA_RESULT_HAS_ACTIVE_TASKS = 3

@@ -1,21 +1,9 @@
-"""
-Router che implementa il contratto atteso da
-it.unisalento.faro.clients.RaspberryClient (Java):
-
-    PUT /api/thresholds
-    GET /api/thresholds
-
-Il backend chiama questi endpoint quando un admin aggiorna le soglie
-di un'area dalla dashboard.
-"""
-
 import logging
-
-from fastapi import APIRouter
 
 from app.config import persist_thresholds
 from app.dto.threshold_dto import ThresholdUpdateDTO
 from app.services.sensor_service import sensor_service
+from fastapi import APIRouter
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +13,7 @@ router = APIRouter()
 @router.get("/thresholds", response_model=ThresholdUpdateDTO)
 def get_thresholds():
     current = sensor_service.get_thresholds()
+
     return ThresholdUpdateDTO(
         thresholdTemperature=current["threshold_temperature"],
         thresholdHumidity=current["threshold_humidity"],
@@ -39,6 +28,7 @@ def update_thresholds(dto: ThresholdUpdateDTO):
         threshold_humidity=dto.thresholdHumidity,
         danger_index_threshold=dto.dangerIndexThreshold,
     )
+
     persist_thresholds(
         dto.thresholdTemperature,
         dto.thresholdHumidity,

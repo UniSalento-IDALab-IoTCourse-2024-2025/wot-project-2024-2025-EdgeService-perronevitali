@@ -1,8 +1,3 @@
-"""
-Client HTTP verso OperationalServiceFARO (backend Java).
-Usa httpx in modalità asincrona, coerente con il resto dello stack FastAPI.
-"""
-
 import logging
 
 import httpx

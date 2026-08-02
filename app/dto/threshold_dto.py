@@ -1,7 +1,3 @@
-"""
-DTO coerente con it.unisalento.faro.dto.otherDTO.ThresholdUpdateDTO (Java).
-"""
-
 from pydantic import BaseModel
 
 
