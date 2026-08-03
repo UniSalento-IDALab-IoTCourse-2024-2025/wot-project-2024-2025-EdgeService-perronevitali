@@ -18,3 +18,7 @@ MESSAGE_TYPE_AREA_SAFE = "AREA_SAFE"
 # Stato area
 AREA_STATUS_OK = 0
 AREA_STATUS_ALERT = 1
+
+# Sliding window per il calcolo della media delle grandezze
+WINDOW_SIZE = 5
+RECOVERY_CONFIRMATIONS_REQUIRED = 5

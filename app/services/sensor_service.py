@@ -2,7 +2,12 @@ import logging
 import threading
 
 from app.config import settings
-from app.constants import AREA_STATUS_OK, AREA_STATUS_ALERT
+from app.constants import (
+    AREA_STATUS_OK,
+    AREA_STATUS_ALERT,
+    WINDOW_SIZE,
+    RECOVERY_CONFIRMATIONS_REQUIRED,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +43,19 @@ class SensorService:
 
             self._dht = adafruit_dht.DHT11(getattr(board, pin_name))
 
-        # Soglie mutabili a runtime inizializzate da config.ini,
-        # aggiornabili via PUT /api/thresholds
+        # Soglie inizializzate da config.ini, aggiornabili tramite PUT /api/thresholds
         self._lock = threading.Lock()
         self._threshold_temperature = settings.sensor.threshold_temperature
         self._threshold_humidity = settings.sensor.threshold_humidity
         self._danger_index_threshold = settings.area.danger_index_threshold
         self._current_status = AREA_STATUS_OK
+
+        # Sliding window
+        self._temperature_window = []
+        self._humidity_window = []
+        self._ok_checks = 0
+        self._last_avg_temperature = None
+        self._last_avg_humidity = None
 
     # Lettura
 
@@ -116,13 +127,49 @@ class SensorService:
             return self._current_status
 
     def evaluate_status_transition(self, temperature: float, humidity: float) -> int | None:
-        anomalous = self.is_anomalous(temperature, humidity)
-        new_status = AREA_STATUS_ALERT if anomalous else AREA_STATUS_OK
-
         with self._lock:
-            if new_status == self._current_status:
+            self._temperature_window.append(temperature)
+            if len(self._temperature_window) > WINDOW_SIZE:
+                self._temperature_window.pop(0)
+
+            self._humidity_window.append(humidity)
+            if len(self._humidity_window) > WINDOW_SIZE:
+                self._humidity_window.pop(0)
+
+            if len(self._temperature_window) < WINDOW_SIZE:
                 return None
-            self._current_status = new_status
-            return new_status
+
+            avg_temperature = sum(self._temperature_window) / len(self._temperature_window)
+            avg_humidity = sum(self._humidity_window) / len(self._humidity_window)
+            self._last_avg_temperature = avg_temperature
+            self._last_avg_humidity = avg_humidity
+
+            anomalous = (
+                avg_temperature > self._threshold_temperature
+                or avg_humidity > self._threshold_humidity
+            )
+
+            if anomalous:
+                self._ok_checks = 0
+                if self._current_status != AREA_STATUS_ALERT:
+                    self._current_status = AREA_STATUS_ALERT
+                    return AREA_STATUS_ALERT
+                return None
+
+            if self._current_status == AREA_STATUS_ALERT:
+                self._ok_checks += 1
+                if self._ok_checks >= RECOVERY_CONFIRMATIONS_REQUIRED:
+                    self._current_status = AREA_STATUS_OK
+                    self._ok_checks = 0
+                    return AREA_STATUS_OK
+
+            return None
+
+    def get_last_averages(self) -> dict:
+        with self._lock:
+            return {
+                "avg_temperature": self._last_avg_temperature,
+                "avg_humidity": self._last_avg_humidity,
+            }
 
 sensor_service = SensorService()

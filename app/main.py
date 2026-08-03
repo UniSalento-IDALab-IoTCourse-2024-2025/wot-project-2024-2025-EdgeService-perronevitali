@@ -72,6 +72,9 @@ async def sensor_polling_loop(area_id: str | None) -> None:
                 new_status = sensor_service.evaluate_status_transition(temperature, humidity)
                 if new_status is not None:
                     thresholds = sensor_service.get_thresholds()
+                    averages = sensor_service.get_last_averages()
+                    avg_temperature = averages["avg_temperature"]
+                    avg_humidity = averages["avg_humidity"]
 
                     if new_status == AREA_STATUS_ALERT:
                         logger.warning(f"Transizione OK → ALERT per area {area_id}")
@@ -79,8 +82,8 @@ async def sensor_polling_loop(area_id: str | None) -> None:
                             area_id=area_id,
                             area_name=settings.area.name,
                             status=new_status,
-                            current_temperature=temperature,
-                            current_humidity=humidity,
+                            current_temperature=avg_temperature,
+                            current_humidity=avg_humidity,
                             threshold_temperature=thresholds["threshold_temperature"],
                             threshold_humidity=thresholds["threshold_humidity"],
                         )
@@ -89,8 +92,8 @@ async def sensor_polling_loop(area_id: str | None) -> None:
                         await rabbitmq_service.publish_area_safe(
                             area_id=area_id,
                             area_name=settings.area.name,
-                            current_temperature=temperature,
-                            current_humidity=humidity,
+                            current_temperature=avg_temperature,
+                            current_humidity=avg_humidity,
                         )
         except Exception:
             logger.exception("Errore imprevisto nel loop di polling")
