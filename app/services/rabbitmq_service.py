@@ -59,7 +59,6 @@ class RabbitMQService:
     async def publish_sensor_reading(
         self, area_id: str, temperature: float, humidity: float
     ) -> None:
-        """Pubblica una singola lettura grezza su faro.sensors."""
         if self._sensors_exchange is None:
             logger.error("RabbitMQ non connesso — impossibile pubblicare la lettura")
             return
@@ -92,7 +91,7 @@ class RabbitMQService:
             body=faro_message.model_dump_json().encode("utf-8"),
             content_type="application/json",
             type=message_type,
-            delivery_mode=DeliveryMode.NOT_PERSISTENT,  # coda temporanea, non durevole
+            delivery_mode=DeliveryMode.PERSISTENT,
         )
 
         await self._areas_exchange.publish(message, routing_key=area_routing_key(area_id))
