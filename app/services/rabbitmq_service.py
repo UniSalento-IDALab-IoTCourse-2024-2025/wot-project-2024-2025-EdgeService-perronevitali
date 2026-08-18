@@ -2,18 +2,18 @@ import logging
 from datetime import datetime, timezone
 
 import aio_pika
+import paho.mqtt.client as mqtt
 from aio_pika import ExchangeType, Message, DeliveryMode
 from aio_pika.abc import AbstractRobustConnection, AbstractChannel, AbstractExchange
 
 from app.config import settings
 from app.constants import (
     EXCHANGE_SENSORS,
-    EXCHANGE_AREAS,
     ROUTING_KEY_SENSORS,
     MESSAGE_TYPE_SENSOR_READING,
     MESSAGE_TYPE_AREA_ALERT,
     MESSAGE_TYPE_AREA_SAFE,
-    area_routing_key,
+    area_mqtt_topic,
 )
 from app.dto.sensor_reading_dto import SensorReadingUpdateDTO
 from app.dto.area_message_dto import FaroMessage, AreaAlertPayload, AreaSafePayload
@@ -26,7 +26,7 @@ class RabbitMQService:
         self._connection: AbstractRobustConnection | None = None
         self._channel: AbstractChannel | None = None
         self._sensors_exchange: AbstractExchange | None = None
-        self._areas_exchange: AbstractExchange | None = None
+        self._mqtt_client: mqtt.Client | None = None
 
     async def connect(self) -> None:
         logger.info(
@@ -43,16 +43,25 @@ class RabbitMQService:
         self._sensors_exchange = await self._channel.declare_exchange(
             EXCHANGE_SENSORS, ExchangeType.DIRECT, durable=True,
         )
-        self._areas_exchange = await self._channel.declare_exchange(
-            EXCHANGE_AREAS, ExchangeType.TOPIC, durable=True,
-        )
 
         logger.info("Connessione RabbitMQ stabilita, exchange dichiarati")
+
+        self._mqtt_client = mqtt.Client()
+        self._mqtt_client.username_pw_set(settings.mqtt.username, settings.mqtt.password)
+        self._mqtt_client.connect(settings.mqtt.host, settings.mqtt.port)
+        self._mqtt_client.loop_start()
+
+        logger.info(f"Connessione MQTT stabilita {settings.mqtt.host}:{settings.mqtt.port}")
 
     async def close(self) -> None:
         if self._connection is not None and not self._connection.is_closed:
             await self._connection.close()
             logger.info("Connessione RabbitMQ chiusa")
+
+        if self._mqtt_client is not None:
+            self._mqtt_client.loop_stop()
+            self._mqtt_client.disconnect()
+            logger.info("Connessione MQTT chiusa")
 
     # Letture sensore
 
@@ -80,22 +89,32 @@ class RabbitMQService:
         await self._sensors_exchange.publish(message, routing_key=ROUTING_KEY_SENSORS)
         logger.debug(f"Lettura pubblicata: T={temperature:.1f}°C U={humidity:.1f}%")
 
-    # Allarmi per area (faro.areas)
+    # Allarmi per area (MQTT con retain)
 
-    async def _publish_area_message(self, area_id: str, message_type: str, faro_message: FaroMessage) -> None:
-        if self._areas_exchange is None:
-            logger.error("RabbitMQ non connesso — impossibile pubblicare il messaggio d'area")
+    def _publish_area_message(
+        self, area_id: str, message_type: str, faro_message: FaroMessage, retain: bool
+    ) -> None:
+        if self._mqtt_client is None:
+            logger.error("MQTT non connesso — impossibile pubblicare il messaggio d'area")
             return
 
-        message = Message(
-            body=faro_message.model_dump_json().encode("utf-8"),
-            content_type="application/json",
-            type=message_type,
-            delivery_mode=DeliveryMode.PERSISTENT,
+        topic = area_mqtt_topic(area_id, message_type)
+        self._mqtt_client.publish(
+            topic,
+            payload=faro_message.model_dump_json().encode("utf-8"),
+            qos=1,
+            retain=retain,
         )
+        logger.info(f"Messaggio {message_type} pubblicato su {topic} (retain={retain})")
 
-        await self._areas_exchange.publish(message, routing_key=area_routing_key(area_id))
-        logger.info(f"Messaggio {message_type} pubblicato su area.{area_id}")
+    def _clear_area_retained(self, area_id: str, message_type: str) -> None:
+        if self._mqtt_client is None:
+            logger.error("MQTT non connesso — impossibile ripulire il retain")
+            return
+
+        topic = area_mqtt_topic(area_id, message_type)
+        self._mqtt_client.publish(topic, payload=None, qos=1, retain=True)
+        logger.info(f"Retain ripulito su {topic}")
 
     async def publish_area_alert(
         self,
@@ -117,7 +136,7 @@ class RabbitMQService:
             thresholdHumidity=threshold_humidity,
         )
         faro_message = FaroMessage.create(MESSAGE_TYPE_AREA_ALERT, payload)
-        await self._publish_area_message(area_id, MESSAGE_TYPE_AREA_ALERT, faro_message)
+        self._publish_area_message(area_id, MESSAGE_TYPE_AREA_ALERT, faro_message, retain=True)
 
     async def publish_area_safe(
         self,
@@ -133,7 +152,8 @@ class RabbitMQService:
             currentHumidity=current_humidity,
         )
         faro_message = FaroMessage.create(MESSAGE_TYPE_AREA_SAFE, payload)
-        await self._publish_area_message(area_id, MESSAGE_TYPE_AREA_SAFE, faro_message)
+        self._publish_area_message(area_id, MESSAGE_TYPE_AREA_SAFE, faro_message, retain=False)
+        self._clear_area_retained(area_id, MESSAGE_TYPE_AREA_SAFE)
 
 
 rabbitmq_service = RabbitMQService()

@@ -40,6 +40,13 @@ class RabbitMQSettings(BaseModel):
     password: str
 
 
+class MqttSettings(BaseModel):
+    host: str
+    port: int = Field(..., ge=1, le=65535)
+    username: str
+    password: str
+
+
 class LoggingSettings(BaseModel):
     level: str = "INFO"
     log_file: str = "logs/sensor_service.log"
@@ -50,10 +57,11 @@ class Settings(BaseModel):
     area: AreaSettings
     external_api: ExternalApiSettings
     rabbitmq: RabbitMQSettings
+    mqtt: MqttSettings
     logging: LoggingSettings
 
 
-REQUIRED_SECTIONS = ["server", "sensor", "area", "external_api", "rabbitmq", "logging"]
+REQUIRED_SECTIONS = ["server", "sensor", "area", "external_api", "rabbitmq", "mqtt", "logging"]
 _DEFAULT_CONFIG_PATH = "config.ini"
 
 
@@ -80,6 +88,7 @@ def load_settings(config_path: str = _DEFAULT_CONFIG_PATH) -> Settings:
             area=AreaSettings(**dict(parser["area"])),
             external_api=ExternalApiSettings(**dict(parser["external_api"])),
             rabbitmq=RabbitMQSettings(**dict(parser["rabbitmq"])),
+            mqtt=MqttSettings(**dict(parser["mqtt"])),
             logging=LoggingSettings(**dict(parser["logging"])),
         )
     except ValidationError as e:

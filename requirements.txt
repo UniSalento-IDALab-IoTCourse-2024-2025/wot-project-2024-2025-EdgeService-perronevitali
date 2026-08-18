@@ -5,3 +5,4 @@ httpx==0.28.1
 adafruit-blinka==9.2.0
 adafruit-circuitpython-dht==4.0.12
 aio-pika==9.5.5
+paho-mqtt==1.6.1
