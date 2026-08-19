@@ -17,6 +17,7 @@ from app.constants import (
 )
 from app.dto.sensor_reading_dto import SensorReadingUpdateDTO
 from app.dto.area_message_dto import FaroMessage, AreaAlertPayload, AreaSafePayload
+from app.services.push_notification_service import push_notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,7 @@ class RabbitMQService:
         )
         faro_message = FaroMessage.create(MESSAGE_TYPE_AREA_ALERT, payload)
         self._publish_area_message(area_id, MESSAGE_TYPE_AREA_ALERT, faro_message, retain=True)
+        await push_notification_service.notify_area_alert(area_id, area_name)
 
     async def publish_area_safe(
         self,

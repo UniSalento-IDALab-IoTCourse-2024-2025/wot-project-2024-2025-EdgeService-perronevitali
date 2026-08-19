@@ -33,6 +33,12 @@ class ExternalApiSettings(BaseModel):
     timeout_seconds: int = Field(..., gt=0)
 
 
+class UserServiceSettings(BaseModel):
+    base_url: str
+    internal_secret: str
+    timeout_seconds: int = Field(..., gt=0)
+
+
 class RabbitMQSettings(BaseModel):
     host: str
     port: int = Field(..., ge=1, le=65535)
@@ -56,12 +62,13 @@ class Settings(BaseModel):
     sensor: SensorSettings
     area: AreaSettings
     external_api: ExternalApiSettings
+    user_service: UserServiceSettings
     rabbitmq: RabbitMQSettings
     mqtt: MqttSettings
     logging: LoggingSettings
 
 
-REQUIRED_SECTIONS = ["server", "sensor", "area", "external_api", "rabbitmq", "mqtt", "logging"]
+REQUIRED_SECTIONS = ["server", "sensor", "area", "external_api", "user_service", "rabbitmq", "mqtt", "logging"]
 _DEFAULT_CONFIG_PATH = "config.ini"
 
 
@@ -87,6 +94,7 @@ def load_settings(config_path: str = _DEFAULT_CONFIG_PATH) -> Settings:
             sensor=SensorSettings(**dict(parser["sensor"])),
             area=AreaSettings(**dict(parser["area"])),
             external_api=ExternalApiSettings(**dict(parser["external_api"])),
+            user_service=UserServiceSettings(**dict(parser["user_service"])),
             rabbitmq=RabbitMQSettings(**dict(parser["rabbitmq"])),
             mqtt=MqttSettings(**dict(parser["mqtt"])),
             logging=LoggingSettings(**dict(parser["logging"])),
@@ -121,7 +129,7 @@ settings = load_settings()
 
 logging.basicConfig(
     level=getattr(logging, settings.logging.level.upper(), logging.INFO),
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 
 def persist_thresholds(
