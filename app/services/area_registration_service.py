@@ -1,6 +1,6 @@
 import logging
 
-from app.config import settings, persist_area_id, persist_thresholds
+from app.config import settings, persist_area_id
 from app.dto.area_dto import AreaDTO, AreaResponseDTO, AREA_RESULT_OK
 from app.services.external_api_service import external_api_service
 from app.services.sensor_service import sensor_service
@@ -35,17 +35,8 @@ def _apply_thresholds_from_backend(found: AreaDTO) -> None:
         danger_index_threshold=found.dangerIndexThreshold,
     )
 
-    try:
-        persist_thresholds(
-            found.thresholdTemperature,
-            found.thresholdHumidity,
-            found.dangerIndexThreshold,
-        )
-    except Exception:
-        logger.exception("Impossibile persistere le soglie sincronizzate dal backend su config.ini")
-
     logger.info(
-        f"Soglie sincronizzate dal backend: "
+        f"Soglie sincronizzate dal backend (solo in memoria): "
         f"T>{found.thresholdTemperature}°C  U>{found.thresholdHumidity}%  "
         f"dangerIndex>{found.dangerIndexThreshold}"
     )
@@ -61,8 +52,8 @@ async def ensure_area_registered() -> str:
         if settings.area.area_id:
             logger.warning(
                 f"Uso l'area_id già persistito in config.ini come fallback: "
-                f"{settings.area.area_id} (soglie locali non aggiornate: "
-                f"il backend non era raggiungibile)"
+                f"{settings.area.area_id} (soglie non aggiornate: si continua "
+                f"a usare quelle correnti finché il backend non torna raggiungibile)"
             )
             return settings.area.area_id
         raise
