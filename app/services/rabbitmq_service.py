@@ -70,7 +70,7 @@ class RabbitMQService:
         self, area_id: str, temperature: float, humidity: float
     ) -> None:
         if self._sensors_exchange is None:
-            logger.error("RabbitMQ non connesso — impossibile pubblicare la lettura")
+            logger.error("RabbitMQ non connesso. Impossibile pubblicare la lettura")
             return
 
         dto = SensorReadingUpdateDTO(
@@ -96,7 +96,7 @@ class RabbitMQService:
         self, area_id: str, message_type: str, faro_message: FaroMessage, retain: bool
     ) -> None:
         if self._mqtt_client is None:
-            logger.error("MQTT non connesso — impossibile pubblicare il messaggio d'area")
+            logger.error("MQTT non connesso. Impossibile pubblicare il messaggio d'area")
             return
 
         topic = area_mqtt_topic(area_id, message_type)
@@ -110,7 +110,7 @@ class RabbitMQService:
 
     def _clear_area_retained(self, area_id: str, message_type: str) -> None:
         if self._mqtt_client is None:
-            logger.error("MQTT non connesso — impossibile ripulire il retain")
+            logger.error("MQTT non connesso. Impossibile ripulire il retain")
             return
 
         topic = area_mqtt_topic(area_id, message_type)
@@ -156,6 +156,7 @@ class RabbitMQService:
         faro_message = FaroMessage.create(MESSAGE_TYPE_AREA_SAFE, payload)
         self._publish_area_message(area_id, MESSAGE_TYPE_AREA_SAFE, faro_message, retain=False)
         self._clear_area_retained(area_id, MESSAGE_TYPE_AREA_SAFE)
+        await push_notification_service.notify_area_safe(area_id, area_name)
 
 
 rabbitmq_service = RabbitMQService()

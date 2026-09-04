@@ -20,7 +20,7 @@ async def register_area_with_retry() -> str | None:
     for attempt, delay in enumerate([0] + _REGISTRATION_RETRY_DELAYS, start=1):
         if delay:
             logger.warning(
-                f"Registrazione area fallita — nuovo tentativo tra {delay}s "
+                f"Registrazione area fallita: nuovo tentativo tra {delay}s "
                 f"(tentativo {attempt}/{len(_REGISTRATION_RETRY_DELAYS) + 1})"
             )
             await asyncio.sleep(delay)
@@ -33,8 +33,7 @@ async def register_area_with_retry() -> str | None:
             logger.exception("Errore durante la registrazione dell'area")
 
     logger.error(
-        "Registrazione area non riuscita dopo tutti i tentativi — "
-        "il servizio parte comunque ma il polling resta disattivo"
+        "Registrazione area non riuscita dopo tutti i tentativi"
     )
     return None
 
@@ -44,8 +43,7 @@ async def sensor_polling_loop(area_id: str | None) -> None:
 
     while area_id is None:
         logger.warning(
-            "area_id non disponibile — polling in pausa, nuovo tentativo di "
-            "registrazione tra 60s"
+            "area_id non disponibile, nuovo tentativo tra 60s"
         )
         await asyncio.sleep(60)
         try:
@@ -67,7 +65,7 @@ async def sensor_polling_loop(area_id: str | None) -> None:
                 await rabbitmq_service.publish_sensor_reading(
                     area_id=area_id, temperature=temperature, humidity=humidity
                 )
-                logger.info(f"T={temperature:.1f}°C  U={humidity:.1f}%  → pubblicato")
+                logger.info(f"T={temperature:.1f}°C  U={humidity:.1f}%")
 
                 new_status = sensor_service.evaluate_status_transition(temperature, humidity)
                 if new_status is not None:
